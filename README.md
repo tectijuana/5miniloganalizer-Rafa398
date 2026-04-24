@@ -8,7 +8,7 @@
 **Modalidad:** Individual
 **Entorno de trabajo:** AWS Ubuntu ARM64 + GitHub Classroom
 **Lenguaje:** ARM64 Assembly (GNU Assembler) + Bash + GNU Make
-
+Alumno: Rafael Del Callejo Tapia
 ---
 
 ## Introducción
@@ -66,61 +66,139 @@ El estudiante deberá completar la lógica correspondiente.
 
 ## Variantes de la práctica
 
-### Variante A
-
-Contabilizar:
-
-* respuestas exitosas (2xx)
-* errores del cliente (4xx)
-* errores del servidor (5xx)
-
----
-
-### Variante B
-
-Determinar el código de estado más frecuente.
-
----
 
 ### Variante C
+/*========================================================
+Nombre: analyzer.s
+Detecta el primer 503 leyendo carácter por carácter
+==========================================================*/
 
-Detectar el primer evento crítico (503).
+.global _start
+
+.section .data
+msg: .ascii "503 detected\n"
+len = . - msg
+
+.section .bss
+char: .skip 1
+
+.section .text
+
+_start:
+
+    mov x2, 0      // número actual = 0
+
+loop:
+    // read 1 byte
+    mov x0, 0
+    ldr x1, =char
+    mov x2, 1
+    mov x8, 63
+    svc 0
+
+    cmp x0, 0
+    beq exit
+
+    ldrb w3, [x1]
+
+    cmp w3, 10     // '\n'
+    beq check
+
+    sub w3, w3, '0'
+    mov x4, 10
+    mul x2, x2, x4
+    add x2, x2, x3
+
+    b loop
+
+check:
+    mov x5, 503
+    cmp x2, x5
+    beq found
+
+    mov x2, 0      // reset número
+    b loop
+
+found:
+    mov x0, 1
+    ldr x1, =msg
+    mov x2, len
+    mov x8, 64
+    svc 0
+
+exit:
+    mov x0, 0
+    mov x8, 93
+    svc 0
+
+##Explicacion de diseño
+## Diseño y lógica utilizada
+
+El programa fue diseñado para detectar el primer evento crítico con código **503** a partir de un flujo de datos recibido por la entrada estándar (`stdin`). Este flujo proviene del archivo `logs.txt`, el cual se redirige al programa mediante el uso de tuberías en Linux.
+
+### Diseño general
+
+La solución sigue un enfoque de **procesamiento secuencial**, donde los datos son leídos carácter por carácter utilizando la syscall `read`. Este enfoque fue elegido debido a que en lenguaje ensamblador no existen funciones de alto nivel como `scanf`, por lo que es necesario implementar manualmente el análisis de los datos.
+
+El programa se estructura en las siguientes etapas:
+
+1. **Lectura de datos**
+   Se utiliza la syscall `read` para obtener un byte a la vez desde la entrada estándar. Esto permite un control preciso sobre el flujo de datos y facilita la identificación de separadores (saltos de línea).
+
+2. **Construcción del número**
+   Cada carácter leído es evaluado:
+
+   * Si es un dígito (`'0'` a `'9'`), se convierte de ASCII a su valor numérico.
+   * Se construye el número acumulado multiplicando el valor actual por 10 y sumando el nuevo dígito.
+
+   Este proceso simula el comportamiento de conversión de cadenas a enteros en lenguajes de alto nivel.
+
+3. **Detección de fin de número**
+   Cuando se detecta un salto de línea (`'\n'`), se considera que el número ha sido completamente leído.
+
+4. **Comparación del valor**
+   El número construido se compara con el valor objetivo (503) mediante instrucciones de comparación (`cmp`).
+
+   * Si el valor coincide, se procede a mostrar el mensaje correspondiente.
+   * Si no coincide, el acumulador se reinicia y el proceso continúa.
+
+5. **Salida del programa**
+   En caso de detectar el código 503, se utiliza la syscall `write` para imprimir el mensaje `"503 detected"` en la salida estándar.
+   Posteriormente, el programa finaliza utilizando la syscall `exit`.
 
 ---
 
-### Variante D
+### Lógica de control
 
-Detectar tres errores consecutivos.
+El flujo del programa se basa en:
 
----
-
-### Variante E
-
-Calcular índice de salud:
-
-```text id="2u4vvx"
-Health Score = 100 - (errores × 10)
-```
+* **Estructura iterativa**: implementada mediante etiquetas y saltos (`b`, `beq`, `bne`), simulando un ciclo `while`.
+* **Condicionales**: implementados con la instrucción `cmp` seguida de saltos condicionales.
+* **Acumulador numérico**: almacenado en un registro, el cual se reinicia cada vez que se termina de procesar un número.
 
 ---
 
-## Compilación
+### Justificación del enfoque
 
-```bash id="bmubtb"
-make
-```
+El uso de lectura carácter por carácter permite:
 
----
-
-## Ejecución
-
-```bash id="gcqlf2"
-cat logs.txt | ./analyzer
-```
+* Control total sobre el parsing de datos
+* Independencia de funciones externas (como librerías C)
+* Cumplimiento de la restricción de utilizar exclusivamente ensamblador ARM64
+* Aplicación directa de conceptos como manejo de registros, memoria y flujo de control
 
 ---
 
-## Entregables
+### Conclusión
+
+El programa demuestra cómo un problema de procesamiento de datos, que normalmente se resolvería fácilmente en lenguajes de alto nivel, puede ser implementado a bajo nivel utilizando instrucciones de ensamblador ARM64. Se aplican conceptos fundamentales como:
+
+* Manipulación de registros
+* Conversión de datos
+* Control de flujo
+* Uso de syscalls de Linux
+
+Esto permite comprender de manera más profunda cómo la arquitectura procesa información a nivel máquina.
 
 Cada estudiante deberá entregar en su repositorio:
 
@@ -164,4 +242,4 @@ Comprender cómo un problema de procesamiento de datos es implementado a nivel m
 ## Nota
 
 Aunque este problema puede resolverse fácilmente en lenguajes de alto nivel, el propósito de la práctica es implementar **cómo lo resolvería la arquitectura**, no únicamente obtener el resultado.
-
+ https://asciinema.org/a/2VXRr4yMx3PpiOmQ
